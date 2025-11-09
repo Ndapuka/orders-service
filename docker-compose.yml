@@ -1,0 +1,188 @@
+services:
+  orders-service:
+    container_name: orders-service
+    image: orders-service:v1
+    build:
+      context: ./eCommerceSolution.OrderService
+      dockerfile: OrdersMicroservice.API/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_Logging__LogLevel__Default: Debug
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: "27017"
+      MONGODB_DATABASE: OrdersDatabase
+      UsersMicroserviceName: apigateway
+      UsersMicroservicePort: "8080" # Port for users microservice
+      ProductsMicroserviceName: apigateway
+      ProductsMicroservicePort: "8080"
+      REDIS_CACHE_HOST: redis_cache
+      REDIS_CACHE_PORT: "6379"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: user
+      RABBITMQ_PASSWORD: password
+      RABBITMQ_PRODUCTS_EXCHANGE: product.exchange 
+
+    ports:
+      - "7000:8080"
+    networks:
+      - orders-mongodb-network
+      - ecommerce-network
+    depends_on:
+      - users-microservice
+      - products-microservice
+      - mongodb
+      - rabbitmq
+  
+  mongodb:
+    image: mongodb:v1
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongodb/mongodb-init:/docker-entrypoint-initdb.d
+    networks:
+      - orders-mongodb-network
+
+  products-microservice:
+    image: products-service:v1
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ASPNETCORE_ENVIRONMENT: Development
+      MYSQL_HOST: mysql-container
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ecommerceproductsdatabase
+      MYSQL_USER: root
+      MYSQL_PASSWORD: admin
+      RABBITMQ_HOSTNAME: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: user
+      RABBITMQ_PASSWORD: password
+      RABBITMQ_PRODUCTS_EXCHANGE: product.exchange
+    ports:
+      - "6001:8080"
+    networks:
+      - products-mysql-network
+      - ecommerce-network 
+    depends_on:
+      - mysql-container
+  
+  
+  mysql-container:
+    image: mysql:v1
+    environment:    
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_DATABASE: ecommerceproductsdatabase
+      
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./mysql/mysql-init:/docker-entrypoint-initdb.d
+    networks:
+      - products-mysql-network
+    hostname: mysql-container
+    command: --default-authentication-plugin=mysql_native_password
+
+
+  users-microservice:
+    image: users-service:v1  
+    build:
+      context: ./eCommerce.Solution.UserService
+      dockerfile: eCommerce.API/Dockerfile 
+    
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080" #added for clarity
+      ASPNETCORE_HTTP_ENVIRONMENT: Development
+      POSTGRES_HOST: postgres-container
+      POSTGRES_PORT: "5432"
+      POSTGRES_DATABASE: eCommerceUsers
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+
+    ports:
+       - "5000:8080" #added for clarity
+    networks:
+      - users-postgres-network
+      - ecommerce-network 
+    depends_on:
+      - postgres-container
+
+  postgres-container:
+    image: postgres:v1
+    container_name: postgres-container
+    environment:
+      POSTGRES_DB: eCommerceUsers
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/postgres-init:/docker-entrypoint-initdb.d
+    networks:
+      - users-postgres-network 
+
+  redis_cache:
+    image: redis:v1
+    container_name: redis-container
+    ports:
+      - "6378:6379"
+    volumes:
+      - ./redis-cache:/data
+    
+    networks:
+      - ecommerce-network
+
+  apigateway:
+    image: apigateway:v1
+    build:
+      context: ./ApiGateway
+      dockerfile: Dockerfile
+    ports: 
+      - "4000:8080"
+    networks:
+      - ecommerce-network
+
+  rabbitmq:
+    image: rabbitmq:v1
+    container_name: rabbitmq-container
+    ports:
+      - "15672:15672" # RabbitMQ Management UI
+      - "5672:5672"   # RabbitMQ AMQP protocol
+    environment:
+      RABBITMQ_HOSTNAME: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
+      RABBITMQ_LOG_LEVEL: debug
+    networks:
+      - ecommerce-network
+    healthcheck:
+     test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+     interval: 10s
+     timeout: 5s
+     retries: 5
+
+networks:
+  orders-mongodb-network:
+    driver: bridge
+  products-mysql-network:
+    driver: bridge
+  users-postgres-network:
+    driver: bridge
+  ecommerce-network:
+    driver: bridge
+
+volumes:
+    postgres_data:
+        driver: local
+        
+     
+
+ 
+
+
+
+
+
+  

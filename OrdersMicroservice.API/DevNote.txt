@@ -1,0 +1,3 @@
+﻿
+QoSOptions
+Quality of Service (QoS) options in Ocelot allow you to manage the reliability of your API Gateway by applying various fault-tolerance policies such as circuit breakers, timeouts, and retries. These options help ensure that your gateway handles failures gracefully and maintains a good user experience even when downstream services experience issues.
